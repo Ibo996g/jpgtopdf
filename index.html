@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>محول PDF الاحترافي</title>
+    
+    <!-- CDNs for libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for in-browser JSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Fonts and Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- Base and Animations --- */
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #F0F2F5; /* Light gray background for Neumorphism */
+            overflow-x: hidden;
+            color: #4A5568; /* Darker text for readability */
+        }
+        .file-previewer-container::-webkit-scrollbar { display: none; }
+        .file-previewer-container { -ms-overflow-style: none; scrollbar-width: none; }
+        .animate-fade-in { animation: fade-in 0.6s cubic-bezier(0.390, 0.575, 0.565, 1.000) forwards; }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        
+        .animated-rocket {
+            animation: float 4s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-12px); }
+        }
+        
+        .tool-icon-pulse {
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .group:hover .tool-icon-pulse {
+            animation: pulse 0.8s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        /* --- Neumorphism Style --- */
+        .neumorph-card {
+            background: #F0F2F5;
+            border-radius: 2rem;
+            box-shadow: 12px 12px 24px #c8cacf, -12px -12px 24px #ffffff;
+        }
+        
+        .neumorph-btn {
+            background: #F0F2F5;
+            border-radius: 1rem;
+            box-shadow: 6px 6px 12px #c8cacf, -6px -6px 12px #ffffff;
+            transition: all 0.2s ease-in-out;
+        }
+        .neumorph-btn:hover {
+            box-shadow: 4px 4px 8px #c8cacf, -4px -4px 8px #ffffff;
+        }
+        .neumorph-btn:active, .neumorph-btn-pressed {
+            box-shadow: inset 6px 6px 12px #c8cacf, inset -6px -6px 12px #ffffff;
+            color: #8B5CF6; /* Violet-500 */
+        }
+
+        .neumorph-inset {
+             background: #F0F2F5;
+             border-radius: 1rem;
+             box-shadow: inset 6px 6px 12px #c8cacf, inset -6px -6px 12px #ffffff;
+        }
+
+        .dropzone-active {
+            background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='16' ry='16' stroke='%238B5CF6' stroke-width='3' stroke-dasharray='12%2c 12' stroke-dashoffset='0' stroke-linecap='round'/%3e%3c/svg%3e");
+            animation: dash 1s linear infinite;
+        }
+        @keyframes dash {
+            to { stroke-dashoffset: -24; }
+        }
+
+        /* --- Glassmorphism Modal Style --- */
+        .glass-modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 24px 16px;
+            overflow-y: auto;
+            transition: all 0.4s ease;
+        }
+
+        .glass-modal-content {
+            background: rgba(255, 255, 255, 0.78);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+            border-radius: 1.75rem;
+            animation: slide-down-glass 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slide-down-glass {
+            0% {
+                opacity: 0;
+                transform: translateY(-80px) scale(0.96);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .glass-card-item {
+            background: rgba(255, 255, 255, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            border-radius: 1.25rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .glass-card-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -6px rgba(139, 92, 246, 0.15), 0 4px 12px rgba(0, 0, 0, 0.05);
+            border-color: rgba(139, 92, 246, 0.3);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="text-gray-700">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- React Hooks Destructuring ---
+        const { useState, useEffect, useCallback, useRef, memo } = React;
+
+        // --- Library Access ---
+        const { PDFDocument, rgb, degrees, StandardFonts } = PDFLib;
+        const pdfjsLib = window.pdfjsLib;
+        const JSZip = window.JSZip;
+
+        // Set up pdf.js worker to avoid errors.
+        if (pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+        }
+        
+        // --- App-wide Types and Constants ---
+        const ToolType = {
+            JPG_TO_PDF: 'تحويل إلى PDF',
+            PDF_TO_JPG: 'PDF إلى JPG',
+            PDF_COMPRESSOR: 'ضغط PDF',
+            ORGANIZE_PDF: 'تنظيم PDF',
+            PDF_TO_DOC: 'PDF إلى Word',
+            DOC_TO_PDF: 'Word إلى PDF',
+            PDF_TO_EXCEL: 'PDF إلى Excel',
+            PDF_TO_POWERPOINT: 'PDF إلى PowerPoint',
+        };
+
+        // --- Sound Effect ---
+        const playSound = (volume = 0.4) => {
+            try {
+                const clickSound = new Audio('data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU2LjM2LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV6urq6urq6urq6urq6urq6urq6urq6urq6v////////////////////////////////8AAAAATGF2YzU2LjQxAAAAAAAAAAAAAAAAAAAAAAAACgAAAAAAAAAGDSr/4xAAERqTAAANVqdsmIu9iSEEgjjZALixR1i23f27iK3w02fLAHHb+/8+e9Y+sB8//OEXpB0Z/2e15zI/2Q4//OEPkGgz//k2e/qwz4j/2Y8BQAqgAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//OEXpB0Z/2e15zI/2Q4//OEPkGgz//k2e/qwz4j/2Y8BQAqgAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+                clickSound.volume = volume;
+                clickSound.play().catch(() => {});
+            } catch (e) {
+                console.error("Sound could not be played.", e);
+            }
+        };
+
+        const fileToDataUrl = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        };
+        
+        const formatBytes = (bytes, decimals = 2) => {
+            if (!bytes || bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // --- PDF Service Logic ---
+        const pdfService = (() => {
+            const processImage = (file, quality) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            if (!ctx) return reject(new Error('لا يمكن الحصول على سياق Canvas'));
+                            
+                            let scale = 1.0;
+                            if (quality === 'medium') scale = 0.5;
+                            else if (quality === 'low') scale = 0.25;
+                            // original and high use 1.0
+
+                            canvas.width = img.width * scale;
+                            canvas.height = img.height * scale;
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                            const isPng = file.type === 'image/png';
+                            const outputMimeType = isPng ? 'image/png' : 'image/jpeg';
+                            
+                            const jpegQuality = isPng ? undefined : 
+                                (quality === 'original' ? 1.0 :
+                                (quality === 'low' ? 0.6 :
+                                (quality === 'medium' ? 0.75 : 0.9))); 
+
+                            canvas.toBlob(
+                                async (blob) => {
+                                    if (!blob) return reject(new Error('فشل تحويل Canvas إلى Blob'));
+                                    resolve({ buffer: await blob.arrayBuffer(), mimeType: outputMimeType });
+                                },
+                                outputMimeType,
+                                jpegQuality
+                            );
+                        };
+                        img.onerror = (err) => reject(err);
+                        if (typeof event.target?.result === 'string') {
+                            img.src = event.target.result;
+                        } else {
+                            reject(new Error("Failed to read image file."));
+                        }
+                    };
+                    reader.onerror = (err) => reject(err);
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            const compressCanvas = (canvas, quality) => {
+                 return new Promise((resolve, reject) => {
+                    const originalWidth = canvas.width;
+                    const originalHeight = canvas.height;
+
+                    let scale = 1.0;
+                    if (quality === 'medium') scale = 0.5;
+                    else if (quality === 'low') scale = 0.25;
+                    // original and high use 1.0
+
+                    const scaledCanvas = document.createElement('canvas');
+                    const ctx = scaledCanvas.getContext('2d');
+                    if (!ctx) return reject(new Error('لا يمكن الحصول على سياق Canvas'));
+
+                    scaledCanvas.width = originalWidth * scale;
+                    scaledCanvas.height = originalHeight * scale;
+                    ctx.drawImage(canvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+
+                    const outputMimeType = 'image/jpeg';
+                    const jpegQuality = (quality === 'original' ? 1.0 : (quality === 'low' ? 0.6 : (quality === 'medium' ? 0.75 : 0.9)));
+
+                    scaledCanvas.toBlob(
+                        async (blob) => {
+                            if (!blob) return reject(new Error('فشل تحويل Canvas إلى Blob'));
+                            resolve({ buffer: await blob.arrayBuffer(), mimeType: outputMimeType });
+                        },
+                        outputMimeType,
+                        jpegQuality
+                    );
+                });
+            };
+            
+            return {
+                processImage,
+                compressCanvas,
+                organizePdf: async (pages, sourceFiles, onProgress) => {
+                    const pdfDoc = await PDFDocument.create();
+                    const sourceDocs = {};
+
+                    // Pre-load all necessary PDF documents to avoid loading them repeatedly.
+                    for (const appFile of sourceFiles) {
+                         if (appFile.file.type === 'application/pdf' && !sourceDocs[appFile.id]) {
+                            try {
+                                const bytes = await appFile.file.arrayBuffer();
+                                sourceDocs[appFile.id] = await PDFDocument.load(bytes, { ignoreEncryption: true });
+                            } catch (e) {
+                                console.error(`Failed to load PDF ${appFile.file.name}:`, e);
+                                // Skip corrupted/protected files instead of crashing
+                            }
+                        }
+                    }
+                    
+                    const totalPages = pages.length;
+                    for (let i = 0; i < totalPages; i++) {
+                        const pageInfo = pages[i];
+                        const sourceFile = sourceFiles.find(f => f.id === pageInfo.sourceFileId);
+                        
+                        if (pageInfo.isBlank) {
+                            pdfDoc.addPage();
+                        } else if (pageInfo.isImage && sourceFile) {
+                            const { buffer: imageBuffer, mimeType } = await processImage(sourceFile.file, 'original');
+                            const image = mimeType === 'image/jpeg' ? await pdfDoc.embedJpg(imageBuffer) : await pdfDoc.embedPng(imageBuffer);
+                            const page = pdfDoc.addPage([image.width, image.height]);
+                            page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+                            page.setRotation(degrees(pageInfo.rotation));
+                        } else if (!pageInfo.isImage) {
+                            const sourceDoc = sourceDocs[pageInfo.sourceFileId];
+                            if (sourceDoc) { // Check if the doc was loaded successfully
+                                const [copiedPage] = await pdfDoc.copyPages(sourceDoc, [pageInfo.originalPageIndex]);
+                                copiedPage.setRotation(degrees(pageInfo.rotation));
+                                pdfDoc.addPage(copiedPage);
+                            }
+                        }
+                        onProgress(((i + 1) / totalPages) * 100);
+                    }
+
+                    return pdfDoc.save();
+                },
+
+                convertPdfToJpg: async (file, onProgress) => {
+                    const images = [];
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                    const baseName = file.name.replace(/\.pdf$/i, '');
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 2.0 }); 
+                        const canvas = document.createElement('canvas'); const context = canvas.getContext('2d');
+                        canvas.height = viewport.height; canvas.width = viewport.width;
+                        if(context) {
+                            await page.render({ canvasContext: context, viewport: viewport }).promise;
+                            images.push({ filename: `${baseName}-page-${i}.jpg`, dataUrl: canvas.toDataURL('image/jpeg', 0.95) });
+                        }
+                        onProgress((i / pdf.numPages) * 100);
+                    }
+                    return images;
+                }
+            };
+        })();
+        
+        // --- React Components ---
+
+        const ComingSoonTool = ({ toolType }) => {
+            const details = {
+                [ToolType.PDF_TO_DOC]: { icon: 'fa-file-word', color: 'text-blue-500' },
+                [ToolType.DOC_TO_PDF]: { icon: 'fa-file-word', color: 'text-blue-500' },
+                [ToolType.PDF_TO_EXCEL]: { icon: 'fa-file-excel', color: 'text-green-500' },
+                [ToolType.PDF_TO_POWERPOINT]: { icon: 'fa-file-powerpoint', color: 'text-orange-500' },
+            }[toolType] || { icon: 'fa-cogs', color: 'text-gray-500' };
+            return (
+                <div className="flex flex-col items-center justify-center text-center p-12 neumorph-inset">
+                    <i className={`fas ${details.icon} fa-4x ${details.color} mb-6`}></i>
+                    <h2 className="text-2xl font-bold text-gray-800">{toolType}</h2>
+                    <p className="mt-2 text-lg text-gray-600">هذه الميزة تتطلب معالجة من جانب الخادم وهي قيد التطوير حالياً.</p>
+                </div>
+            );
+        };
+
+        const Toolbox = ({ activeTool, onSelectTool }) => {
+            const toolConfig = [
+                { type: ToolType.JPG_TO_PDF, icon: 'fa-file-image', emoji: '🖼️' },
+                { type: ToolType.PDF_TO_JPG, icon: 'fa-image', emoji: '🏞️' },
+                { type: ToolType.ORGANIZE_PDF, icon: 'fa-layer-group', emoji: '📑' },
+                { type: ToolType.PDF_COMPRESSOR, icon: 'fa-compress-arrows-alt', emoji: '🗜️' },
+                { type: ToolType.DOC_TO_PDF, icon: 'fa-file-word', emoji: '📄' },
+                { type: ToolType.PDF_TO_DOC, icon: 'fa-file-word', emoji: '📝' },
+                { type: ToolType.PDF_TO_EXCEL, icon: 'fa-file-excel', emoji: '📊' },
+                { type: ToolType.PDF_TO_POWERPOINT, icon: 'fa-file-powerpoint', emoji: '🖥️' },
+            ];
+            
+            return (
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-8 gap-4">
+                    {toolConfig.map(({ type, icon, emoji }) => {
+                        const isEnabled = [ToolType.JPG_TO_PDF, ToolType.PDF_TO_JPG, ToolType.ORGANIZE_PDF, ToolType.PDF_COMPRESSOR].includes(type);
+                        const isActive = activeTool === type;
+                        return (
+                            <div key={type} className={`group relative flex flex-col items-center justify-center text-center p-4 neumorph-btn ${!isEnabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isActive ? 'neumorph-btn-pressed' : ''}`}
+                                onClick={() => isEnabled && (playSound(), onSelectTool(type))}>
+                                {!isEnabled && <span className="absolute top-1 right-1 bg-gray-400 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">قريباً</span>}
+                                <div className="text-4xl mb-2 tool-icon-pulse">{emoji}</div>
+                                <span className={`font-semibold text-sm`}>{type}</span>
+                            </div>
+                        );
+})}
+                </div>
+            );
+        };
+        
+         const FilePreviewItem = ({ appFile, onRemove, index }) => {
+            const [previewUrl, setPreviewUrl] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+            useEffect(() => {
+                let objectUrl = null; let isMounted = true;
+                const generatePreview = async () => {
+                    setIsLoading(true); const file = appFile.file;
+                    try {
+                        if (file.type.startsWith('image/')) { objectUrl = URL.createObjectURL(file); if (isMounted) setPreviewUrl(objectUrl); } 
+                        else if (file.type === 'application/pdf') {
+                            const arrayBuffer = await file.arrayBuffer();
+                            const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                            const page = await pdf.getPage(1); const viewport = page.getViewport({ scale: 0.3 }); // Faster thumbnail
+                            const canvas = document.createElement('canvas'); const context = canvas.getContext('2d');
+                            canvas.height = viewport.height; canvas.width = viewport.width;
+                            if (context) { await page.render({ canvasContext: context, viewport: viewport }).promise; if (isMounted) setPreviewUrl(canvas.toDataURL()); }
+                        }
+                    } catch (e) { console.error('Failed to render preview:', e); if (isMounted) setPreviewUrl(null); } 
+                    finally { if (isMounted) setIsLoading(false); }
+                };
+                generatePreview();
+                return () => { isMounted = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+            }, [appFile.file]);
+            return (
+                <div className={`relative flex-shrink-0 w-32 h-32 p-1 cursor-grab active:cursor-grabbing neumorph-btn`} title={appFile.file.name}>
+                    <span className="absolute top-0 left-0 bg-violet-500 text-white text-xs font-bold rounded-br-lg rounded-tl-lg px-2 py-1 z-10">{index + 1}</span>
+                    <div className="w-full h-full rounded-md flex items-center justify-center overflow-hidden neumorph-inset bg-gray-200">
+                        {isLoading ? <i className="fas fa-spinner spinner text-gray-400 text-2xl"></i> : previewUrl ? <img src={previewUrl} alt={appFile.file.name} className="w-full h-full object-contain" /> : <i className="fas fa-file-alt text-gray-400 text-4xl"></i>}
+                    </div>
+                    <button onClick={() => { playSound(); onRemove(appFile.id); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:bg-red-600 transition-transform hover:scale-110 z-10" aria-label="إزالة"><i className="fas fa-times text-xs"></i></button>
+                </div>
+            );
+        };
+        const MemoizedFilePreviewItem = memo(FilePreviewItem);
+        
+        const GlobalFilePreviewer = ({ files, onRemoveFile, onReorderFiles }) => {
+            const scrollRef = useRef(null);
+            const [draggedId, setDraggedId] = useState(null);
+            const [showScroll, setShowScroll] = useState(false);
+        
+            const checkScroll = useCallback(() => {
+                const el = scrollRef.current;
+                if (el) setShowScroll(el.scrollWidth > el.clientWidth);
+            }, []);
+        
+            useEffect(() => {
+                checkScroll();
+                const observer = new MutationObserver(checkScroll);
+                if (scrollRef.current) {
+                    observer.observe(scrollRef.current, { childList: true, subtree: true });
+                }
+                window.addEventListener('resize', checkScroll);
+                return () => {
+                     window.removeEventListener('resize', checkScroll);
+                     observer.disconnect();
+                }
+            }, [files, checkScroll]);
+        
+            const handleScroll = (dir) => {
+                if (scrollRef.current) {
+                    playSound(0.3);
+                    scrollRef.current.scrollBy({ left: (dir === 'left' ? -1 : 1) * scrollRef.current.clientWidth * 0.8, behavior: 'smooth' });
+                }
+            };
+        
+            const handleDragStart = (id) => setDraggedId(id);
+            const handleDragOver = (e) => e.preventDefault();
+            const handleDrop = (dropId) => {
+                if (draggedId && draggedId !== dropId) {
+                    const fromIndex = files.findIndex(f => f.id === draggedId);
+                    const toIndex = files.findIndex(f => f.id === dropId);
+                    if (fromIndex !== -1 && toIndex !== -1) {
+                        onReorderFiles(fromIndex, toIndex);
+                    }
+                }
+                setDraggedId(null);
+            };
+        
+            return (
+                <div className="relative group">
+                    <h3 className="text-xl font-bold text-gray-800 mb-3">🗃️ مساحة العمل ({files.length})</h3>
+                    {showScroll && <button onClick={() => handleScroll('right')} className="absolute top-1/2 right-2 transform -translate-y-1/2 z-20 neumorph-btn !rounded-full w-10 h-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><i className="fas fa-chevron-right text-gray-600"></i></button>}
+                    
+                    <div className="mx-12">
+                        <div ref={scrollRef} className="file-previewer-container flex items-center gap-4 p-4 neumorph-inset overflow-x-auto min-h-[160px]">
+                            {files.map((f, index) => 
+                                <div key={f.id} draggable onDragStart={() => handleDragStart(f.id)} onDragOver={handleDragOver} onDrop={() => handleDrop(f.id)}
+                                 className={`${draggedId === f.id ? 'opacity-50' : ''}`}>
+                                     <MemoizedFilePreviewItem appFile={f} onRemove={onRemoveFile} index={index} />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {showScroll && <button onClick={() => handleScroll('left')} className="absolute top-1/2 left-2 transform -translate-y-1/2 z-20 neumorph-btn !rounded-full w-10 h-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><i className="fas fa-chevron-left text-gray-600"></i></button>}
+                </div>
+            );
+        };
+        
+        const GlobalDropzone = ({ onFilesAdded, isConverting, acceptedTypes, message }) => {
+            const [isDragOver, setIsDragOver] = useState(false);
+            const handleDragEnter = (e) => { e.preventDefault(); e.stopPropagation(); if (!isConverting) setIsDragOver(true); };
+            const handleDragLeave = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(false); };
+            const handleDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
+            const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(false); if (!isConverting) { const f = Array.from(e.dataTransfer.files); if (f.length > 0) { playSound(); onFilesAdded(f); } } };
+            const handleFileChange = (e) => { const f = Array.from(e.target.files || []); if (f.length > 0) { playSound(); onFilesAdded(f); } e.target.value = ''; };
+            const openFileDialog = () => { if (!isConverting) { playSound(); document.getElementById('globalFileInput')?.click(); } };
+            return (
+                <div onClick={openFileDialog} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}
+                    className={`relative flex flex-col items-center justify-center w-full p-8 text-center neumorph-inset transition-all duration-300 ${isDragOver ? 'dropzone-active' : ''} ${!isConverting ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}>
+                    <i className={`fas fa-cloud-upload-alt fa-3x text-gray-400 mb-4 transition-transform duration-300 ${isDragOver ? 'scale-110 text-violet-500' : ''}`}></i>
+                    <p className="text-lg font-semibold text-gray-800">{message}</p>
+                    <p className="text-sm text-gray-500">أو الصق الصور مباشرة باستخدام (Ctrl+V)</p>
+                    <input type="file" id="globalFileInput" className="hidden" multiple accept={acceptedTypes} onChange={handleFileChange} disabled={isConverting} />
+                </div>
+            );
+        };
+        
+        const CombineTool = ({ files, toolType }) => {
+            const [quality, setQuality] = useState('high');
+            const [isConverting, setIsConverting] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [downloadResults, setDownloadResults] = useState({});
+            const [error, setError] = useState(null);
+            const [filename, setFilename] = useState('');
+
+            useEffect(() => {
+                setDownloadResults({});
+                setFilename(`converted-${Date.now()}.pdf`);
+            }, [files, toolType]);
+
+            const toolConfig = {
+                [ToolType.JPG_TO_PDF]: { title: 'تحويل إلى PDF', qualityTitle: "إعدادات جودة الصورة:" },
+                [ToolType.PDF_COMPRESSOR]: { title: 'ضغط PDF', qualityTitle: "إعدادات الضغط:" },
+            };
+            const config = toolConfig[toolType];
+            
+            const handleConvert = async () => {
+                const relevantFiles = toolType === ToolType.PDF_COMPRESSOR ? files.filter(f => f.file.type === 'application/pdf') : files;
+                if (relevantFiles.length === 0) return setError(toolType === ToolType.PDF_COMPRESSOR ? "الرجاء إضافة ملف PDF على الأقل." : "الرجاء إضافة ملف واحد على الأقل.");
+                
+                setIsConverting(true); setProgress(0); setError(null); setDownloadResults({});
+
+                try {
+                    const pageCache = new Map();
+                    let totalRenderSteps = 0;
+                    
+                    for (const { id, file } of relevantFiles) {
+                        if (file.type === 'application/pdf') {
+                            const tempBytes = await file.arrayBuffer();
+                            try {
+                                const tempDoc = await pdfjsLib.getDocument({ data: new Uint8Array(tempBytes) }).promise;
+                                totalRenderSteps += tempDoc.numPages;
+                            } catch (e) {
+                                console.warn(`Skipping unreadable PDF: ${file.name}`);
+                            }
+                        } else {
+                            totalRenderSteps += 1;
+                        }
+                    }
+
+                    let stepsCompleted = 0;
+                    const updateRenderProgress = () => {
+                        stepsCompleted++;
+                        setProgress(Math.min(50, (stepsCompleted / totalRenderSteps) * 50));
+                    };
+                    
+                    const canvasCache = new Map();
+
+                    for (const {id, file} of relevantFiles) {
+                        if (file.type === 'application/pdf') {
+                            const arrayBuffer = await file.arrayBuffer();
+                            try {
+                                const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                                for (let j = 1; j <= pdf.numPages; j++) {
+                                    const page = await pdf.getPage(j);
+                                    const viewport = page.getViewport({ scale: 1.5 }); // Render once at high-res
+                                    const canvas = document.createElement('canvas');
+                                    const context = canvas.getContext('2d');
+                                    canvas.height = viewport.height;
+                                    canvas.width = viewport.width;
+                                    if (context) {
+                                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+                                        canvasCache.set(`${id}-page-${j}`, canvas);
+                                    }
+                                    updateRenderProgress();
+                                }
+                            } catch(e) { /* Already warned */ }
+                        } else if (file.type.startsWith('image/')) {
+                            // No pre-render needed for images, just update progress
+                            updateRenderProgress();
+                        }
+                    }
+                    
+                    const qualities = ['original', 'high', 'medium', 'low'];
+                    const results = {};
+                    
+                    for (let i = 0; i < qualities.length; i++) {
+                        const currentQuality = qualities[i];
+                        const pdfDoc = await PDFDocument.create();
+                        
+                        for (const {id, file} of relevantFiles) {
+                            if (file.type.startsWith('image/')) {
+                                const { buffer, mimeType } = await pdfService.processImage(file, currentQuality);
+                                const image = mimeType === 'image/jpeg' ? await pdfDoc.embedJpg(buffer) : await pdfDoc.embedPng(buffer);
+                                const page = pdfDoc.addPage([image.width, image.height]);
+                                page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+                            } else if (file.type === 'application/pdf') {
+                                const arrayBuffer = await file.arrayBuffer();
+                                try {
+                                    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+                                    for (let j=1; j<= pdf.numPages; j++) {
+                                         const canvas = canvasCache.get(`${id}-page-${j}`);
+                                         if (canvas) {
+                                             const { buffer } = await pdfService.compressCanvas(canvas, currentQuality);
+                                             const image = await pdfDoc.embedJpg(buffer);
+                                             const page = pdfDoc.addPage([image.width, image.height]);
+                                             page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+                                         }
+                                     }
+                                } catch(e) { /* Already warned */ }
+                            }
+                        }
+                        
+                        setProgress(50 + ((i + 1) / qualities.length) * 50);
+
+                        const pdfBytes = await pdfDoc.save();
+                        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                        results[currentQuality] = { url: URL.createObjectURL(blob), size: blob.size };
+                    }
+                    
+                    setDownloadResults(results);
+                    setProgress(100);
+
+                } catch (err) {
+                    setError(`حدث خطأ: ${err.message}`);
+                    setProgress(0);
+                } finally {
+                    setIsConverting(false);
+                }
+            };
+
+            const QualitySelector = ({ selected, onChange, title, results }) => {
+                 const qualityOptions = [ { id: 'original', label: 'الأصلية', emoji: '✨' }, { id: 'high', label: 'عالية', emoji: '🖼️' }, { id: 'medium', label: 'متوسطة', emoji: '👍' }, { id: 'low', label: 'منخفضة', emoji: '📉' } ];
+                return (
+                    <div>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-3">{title}</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            {qualityOptions.map(({ id, label, emoji }) => {
+                                const isSelected = selected === id;
+                                const result = results[id];
+                                return (<div key={id} className={`p-4 text-center cursor-pointer neumorph-btn ${isSelected ? 'neumorph-btn-pressed' : ''}`} onClick={() => { playSound(); onChange(id); }}>
+                                    <div className="text-3xl mb-1">{emoji}</div>
+                                    <div className="font-bold text-gray-800">{label}</div>
+                                    {result && <div className="text-xs text-gray-500 mt-1 animate-fade-in">{formatBytes(result.size)}</div>}
+                                </div>);
+                            })}
+                        </div>
+                    </div>
+                );
+            };
+            const ProgressBar = ({ progress }) => { const p = Math.round(progress); return (<div className="w-full neumorph-inset h-4 my-4 overflow-hidden rounded-full"><div className="bg-violet-500 h-4 rounded-full transition-all duration-500 ease-out" style={{ width: `${p}%` }}></div></div>); };
+            
+            const ActionButton = ({ onClick, disabled, children, colorClass = 'text-gray-700', activeClass = '' }) => (
+                <button onClick={onClick} disabled={disabled} className={`w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 font-semibold transition-all duration-300 neumorph-btn disabled:opacity-60 disabled:cursor-not-allowed ${disabled ? '' : activeClass} ${colorClass}`}>
+                    {children}
+                </button>
+            );
+
+            return (
+                <div className="space-y-8">
+                    <h2 className="text-3xl font-bold text-center text-gray-800">{config.title}</h2>
+                    {error && <div className="bg-red-100 border border-red-300 text-red-700 p-4 rounded-lg neumorph-inset" role="alert"><p className="font-bold">خطأ</p><p>{error}</p></div>}
+                    <div className="space-y-6">
+                        <QualitySelector selected={quality} onChange={setQuality} title={config.qualityTitle} results={downloadResults} />
+                        {downloadResults.high && <div className="animate-fade-in"><label htmlFor="filename" className="block text-lg font-semibold text-gray-800 mb-2">اسم الملف الناتج:</label><input type="text" id="filename" value={filename} onChange={(e) => setFilename(e.target.value)} className="w-full px-4 py-2 rounded-lg focus:ring-violet-400 focus:border-violet-400 text-left neumorph-inset text-gray-800 placeholder-gray-400" dir="ltr" /></div>}
+                    </div>
+                    {isConverting && <div className="flex items-center gap-4"><span className="text-2xl animated-rocket">🚀</span><ProgressBar progress={progress} /></div>}
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
+                        <ActionButton onClick={() => { playSound(); handleConvert(); }} disabled={isConverting || files.length === 0} activeClass="!text-violet-500">
+                            <i className={`fas ${isConverting ? 'fa-spinner spinner' : 'fa-cogs'}`}></i><span>{isConverting ? 'جاري التحويل...' : 'بدء التحويل'}</span>
+                        </ActionButton>
+                        {downloadResults[quality] && 
+                             <a href={downloadResults[quality].url} download={filename} onClick={() => playSound()} className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-violet-500 text-white animate-fade-in">
+                                <i className="fas fa-download"></i><span>تحميل ({formatBytes(downloadResults[quality].size)})</span>
+                            </a>
+                        }
+                    </div>
+                </div>
+            );
+        };
+        
+        const AddPagePlaceholder = ({ onAdd, index }) => {
+            const fileInputRef = useRef(null);
+
+            const handleFileChange = (e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                    playSound();
+                    onAdd(files, index);
+                }
+                e.target.value = ''; // Reset
+            };
+
+            const handleClick = () => fileInputRef.current?.click();
+
+            return (
+                <div className="flex items-center justify-center">
+                    <button
+                        onClick={handleClick}
+                        className="neumorph-btn !rounded-full w-12 h-12 flex items-center justify-center text-violet-500 hover:!text-violet-600 transition-transform duration-200 hover:scale-110"
+                        title="إضافة ملفات في هذا الموضع"
+                    >
+                        <i className="fas fa-plus fa-lg"></i>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            multiple
+                            accept=".pdf,.jpg,.jpeg,.png,.webp"
+                            onChange={handleFileChange}
+                        />
+                    </button>
+                </div>
+            );
+        };
+
+        const OrganizeTool = ({ files }) => {
+            const [pages, setPages] = useState([]);
+            const [sourceFiles, setSourceFiles] = useState([]);
+            const [isLoading, setIsLoading] = useState(false);
+            const [isSaving, setIsSaving] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [downloadUrl, setDownloadUrl] = useState(null);
+            const [error, setError] = useState(null);
+            const [filename, setFilename] = useState(`organized-${Date.now()}.pdf`);
+            const [draggedIndex, setDraggedIndex] = useState(null);
+            const [selectedPages, setSelectedPages] = useState(new Set());
+            
+            useEffect(() => {
+                const processFiles = async () => {
+                     if (files.length === 0) { 
+                        setPages([]); 
+                        setSourceFiles([]);
+                        return; 
+                     }
+                     setIsLoading(true); setError(null);
+                     try {
+                         const newPages = [];
+                         for (const appFile of files) {
+                             if (appFile.file.type.startsWith('image/')) {
+                                 newPages.push({ id: `${appFile.id}-page-1`, sourceFileId: appFile.id, originalPageIndex: 0, rotation: 0, isImage: true });
+                             } else if (appFile.file.type === 'application/pdf') {
+                                 try {
+                                    const fileBytes = await appFile.file.arrayBuffer();
+                                    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBytes) }).promise;
+                                    for (let i = 1; i <= pdf.numPages; i++) {
+                                        newPages.push({ id: `${appFile.id}-page-${i}`, sourceFileId: appFile.id, originalPageIndex: i - 1, pageNumber: i, rotation: 0, isImage: false, pdfDocPromise: Promise.resolve(pdf) });
+                                    }
+                                 } catch (e) {
+                                     console.error(`Could not process PDF ${appFile.file.name}:`, e);
+                                     // Optionally, show a placeholder for the broken PDF
+                                 }
+                             }
+                         }
+                         setPages(newPages);
+                         setSourceFiles(files);
+                     } catch (err) { setError(`فشل في معالجة الملفات: ${err.message}`); } 
+                     finally { setIsLoading(false); }
+                };
+                processFiles();
+            }, [files]);
+            
+            const handleAddLocalFiles = async (newFiles, index) => {
+                setIsLoading(true);
+                try {
+                    const newPages = [];
+                    const newSourceAppFiles = [];
+                    for (const file of newFiles) {
+                        const appFile = { id: `${file.name}-${file.lastModified}-${Math.random()}`, file };
+                        newSourceAppFiles.push(appFile);
+                        if (appFile.file.type.startsWith('image/')) {
+                             newPages.push({ id: `${appFile.id}-page-1`, sourceFileId: appFile.id, originalPageIndex: 0, rotation: 0, isImage: true });
+                        } else if (appFile.file.type === 'application/pdf') {
+                             const fileBytes = await appFile.file.arrayBuffer();
+                             const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(fileBytes) }).promise;
+                             for (let i = 1; i <= pdf.numPages; i++) {
+                                 newPages.push({ id: `${appFile.id}-page-${i}`, sourceFileId: appFile.id, originalPageIndex: i - 1, pageNumber: i, rotation: 0, isImage: false, pdfDocPromise: Promise.resolve(pdf) });
+                             }
+                        }
+                    }
+                    setPages(prev => {
+                        const updatedPages = [...prev];
+                        updatedPages.splice(index, 0, ...newPages);
+                        return updatedPages;
+                    });
+                    setSourceFiles(prev => [...prev, ...newSourceAppFiles]);
+                } catch (err) {
+                    setError(`فشل في إضافة الملفات: ${err.message}`);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleRotate = (id) => { setDownloadUrl(null); setPages(prev => prev.map(p => p.id === id ? { ...p, rotation: (p.rotation + 90) % 360 } : p)); };
+            
+            const handleDelete = (id) => { 
+                setDownloadUrl(null); 
+                setPages(prev => {
+                    const newSelected = new Set(selectedPages);
+                    const pagesToDelete = selectedPages.has(id) ? Array.from(newSelected) : [id];
+                    pagesToDelete.forEach(pid => newSelected.delete(pid));
+                    setSelectedPages(newSelected);
+                    return prev.filter(p => !pagesToDelete.includes(p.id));
+                });
+            };
+
+            const handleDuplicate = (id) => {
+                setDownloadUrl(null);
+                setPages(prev => {
+                    const pagesToDuplicate = [];
+                    const selectedAndCurrent = new Set(selectedPages);
+                    if (selectedPages.size === 0 || !selectedPages.has(id)) {
+                        pagesToDuplicate.push(prev.find(p => p.id === id));
+                    } else {
+                        pagesToDuplicate.push(...prev.filter(p => selectedPages.has(p.id)));
+                    }
+                    
+                    if (pagesToDuplicate.length === 0) return prev;
+
+                    const duplicatedPages = pagesToDuplicate.map(p => ({...p, id: `${p.sourceFileId}-page-${Math.random()}`}));
+                    
+                    const lastOriginalIndex = prev.map(p => p.id).lastIndexOf(pagesToDuplicate[pagesToDuplicate.length - 1].id);
+                    const insertAt = lastOriginalIndex !== -1 ? lastOriginalIndex + 1 : prev.length;
+
+                    const finalPages = [...prev];
+                    finalPages.splice(insertAt, 0, ...duplicatedPages);
+                    return finalPages;
+                });
+            };
+
+            const handleAddBlankPage = (index) => {
+                setDownloadUrl(null);
+                const blankPage = { id: `blank-${Math.random()}`, isBlank: true, rotation: 0 };
+                setPages(prev => {
+                    const newPages = [...prev];
+                    newPages.splice(index, 0, blankPage);
+                    return newPages;
+                });
+            };
+
+            const handlePageClick = (e, pageId) => {
+                 e.preventDefault(); setDownloadUrl(null);
+                 setSelectedPages(prev => {
+                    const newSelection = new Set(prev);
+                    if (e.ctrlKey || e.metaKey) { newSelection.has(pageId) ? newSelection.delete(pageId) : newSelection.add(pageId); } 
+                    else { return new Set(prev.has(pageId) && prev.size === 1 ? [] : [pageId]); }
+                    return newSelection;
+                 });
+            };
+
+            const handleSave = async () => {
+                if (pages.length === 0) return;
+                setIsSaving(true); setProgress(0); setError(null); if(downloadUrl) URL.revokeObjectURL(downloadUrl); setDownloadUrl(null);
+                try {
+                    const pdfBytes = await pdfService.organizePdf(pages, sourceFiles, setProgress);
+                    setDownloadUrl(URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' })));
+                } catch (err) { setError(`فشل في الحفظ: ${err.message}`); } 
+                finally { setIsSaving(false); }
+            };
+            
+            const handleDragOver = (e) => e.preventDefault();
+            
+            const handleDrop = (dropIndex) => {
+                if (draggedIndex === null) return;
+                setPages(currentPages => {
+                    const draggedPage = currentPages[draggedIndex]; if (!draggedPage) return currentPages;
+                    const isMultiDrag = selectedPages.size > 1 && selectedPages.has(draggedPage.id);
+                    const pagesToMoveIds = isMultiDrag ? Array.from(selectedPages).map(id => currentPages.find(p => p.id === id)).sort((a, b) => currentPages.indexOf(a) - currentPages.indexOf(b)).map(p => p.id) : [draggedPage.id];
+                    
+                    const dropTarget = currentPages[dropIndex]; if (pagesToMoveIds.includes(dropTarget?.id)) { setDraggedIndex(null); return currentPages; }
+                    
+                    const pagesToMove = currentPages.filter(p => pagesToMoveIds.includes(p.id));
+                    const remainingPages = currentPages.filter(p => !pagesToMoveIds.includes(p.id));
+                    
+                    let insertionPoint = remainingPages.findIndex(p => p.id === dropTarget?.id);
+
+                    if (dropIndex > draggedIndex) {
+                        // When dragging down, the drop target's index in the remaining array is what we want
+                    } else {
+                        // When dragging up, the drop target's index is correct as is
+                    }
+
+                    if (insertionPoint === -1) { // Dropped at the end
+                        insertionPoint = remainingPages.length;
+                    }
+
+                    remainingPages.splice(insertionPoint, 0, ...pagesToMove);
+                    return remainingPages;
+                });
+                setDownloadUrl(null); setDraggedIndex(null);
+            };
+            
+            const PagePreview = ({ page, index, onRotate, onDelete, onDuplicate, onDragStart, onDrop, onPageClick, isSelected, isDragging, sourceFiles }) => {
+                const [dataUrl, setDataUrl] = useState(null);
+                const [isRendered, setIsRendered] = useState(false);
+                const ref = useRef(null);
+
+                const sourceFile = sourceFiles.find(f => f.id === page.sourceFileId);
+
+                useEffect(() => {
+                    if (page.isBlank) { setIsRendered(true); return; }
+                    if (isRendered) return;
+                     const observer = new IntersectionObserver(async ([entry]) => {
+                        if (entry.isIntersecting) {
+                            observer.disconnect();
+                            let mounted = true;
+                            try {
+                                if(page.isImage && sourceFile) {
+                                    const url = await fileToDataUrl(sourceFile.file);
+                                    if(mounted) setDataUrl(url);
+                                } else if (!page.isImage && sourceFile) {
+                                    const pdf = await page.pdfDocPromise;
+                                    const pdfPage = await pdf.getPage(page.pageNumber);
+                                    const viewport = pdfPage.getViewport({ scale: 1.0 });
+                                    const canvas = document.createElement('canvas'); const context = canvas.getContext('2d');
+                                    canvas.height = viewport.height; canvas.width = viewport.width;
+                                    if(context) {
+                                        await pdfPage.render({canvasContext: context, viewport: viewport}).promise;
+                                        if(mounted) setDataUrl(canvas.toDataURL());
+                                    }
+                                }
+                                if(mounted) setIsRendered(true);
+                            } catch (e) { console.error("Lazy render failed", e); }
+                            return () => { mounted = false; };
+                        }
+                    }, { rootMargin: '400px'});
+
+                    if(ref.current) observer.observe(ref.current);
+                    return () => observer.disconnect();
+                }, [page, sourceFile, isRendered]);
+
+                return (
+                    <div className="relative page-preview-item" ref={ref} onDragOver={(e)=>e.preventDefault()}>
+                         <span className="absolute top-0 right-0 bg-violet-500 text-white text-xs font-bold rounded-bl-lg rounded-tr-lg px-2 py-1 z-10">{index + 1}</span>
+                        <div draggable onDragStart={onDragStart} onDrop={onDrop} onClick={onPageClick}
+                            className={`relative group p-2 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-200 w-full neumorph-btn ${isDragging ? 'opacity-50' : ''} ${isSelected ? 'ring-4 ring-violet-500 shadow-lg !border-violet-500' : ''}`}>
+                            <div className="neumorph-inset rounded-md overflow-hidden flex items-center justify-center min-h-[280px] bg-gray-200">
+                                {page.isBlank ? <div className="text-gray-400 text-center"><i className="far fa-file fa-3x"></i><p>صفحة فارغة</p></div> :
+                                 !isRendered ? <i className="fas fa-spinner spinner text-gray-400 text-3xl"></i> :
+                                 <img src={dataUrl} alt={`Page ${index + 1}`} className="w-full h-full object-contain" style={{ transform: `rotate(${page.rotation}deg)` }} />
+                                }
+                            </div>
+                             {!page.isBlank && <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all flex items-center justify-center gap-2">
+                                <button onClick={(e) => { e.stopPropagation(); playSound(); onDuplicate(page.id); }} className="opacity-0 group-hover:opacity-100 transform group-hover:scale-100 scale-90 transition-all delay-150 bg-green-500 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:bg-green-600" title="تكرار"><i className="far fa-clone"></i></button>
+                                <button onClick={(e) => { e.stopPropagation(); playSound(); onRotate(page.id); }} className="opacity-0 group-hover:opacity-100 transform group-hover:scale-100 scale-90 transition-all delay-75 bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:bg-blue-600" title="تدوير"><i className="fas fa-sync-alt"></i></button>
+                                <button onClick={(e) => { e.stopPropagation(); playSound(); onDelete(page.id); }} className="opacity-0 group-hover:opacity-100 transform group-hover:scale-100 scale-90 transition-all bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-lg hover:bg-red-600" title={selectedPages.has(page.id) ? 'حذف المحدد' : 'حذف'}><i className="fas fa-trash"></i></button>
+                            </div>}
+                        </div>
+                    </div>
+                );
+            };
+            const MemoizedPagePreview = memo(PagePreview);
+
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-3xl font-bold text-center text-gray-800">{ToolType.ORGANIZE_PDF}</h2>
+                    {error && <div className="bg-red-100 border border-red-300 text-red-700 p-4 rounded-lg neumorph-inset"><p className="font-bold">خطأ</p><p>{error}</p></div>}
+                    {(isLoading || isSaving) && (<div><p className="text-center text-gray-600">{isLoading ? 'جاري استخلاص الصفحات...' : 'جاري حفظ الملف...'}</p><div className="w-full neumorph-inset h-4 my-2 rounded-full"><div className="bg-violet-500 h-4 rounded-full" style={{ width: `${progress}%` }}></div></div></div>)}
+                    
+                    {files.length > 0 && <div className="animate-fade-in space-y-4">
+                        <div className="p-4 neumorph-inset flex flex-wrap gap-4 items-center justify-center">
+                           <button onClick={() => handleAddBlankPage(pages.length)} className="flex items-center gap-2 neumorph-btn px-4 py-2"><i className="far fa-file"></i> إضافة صفحة فارغة</button>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-10 p-4 neumorph-inset max-h-[65vh] overflow-y-auto">
+                            <AddPagePlaceholder onAdd={handleAddLocalFiles} index={0} />
+                            {pages.map((p, index) => (
+                                <React.Fragment key={p.id}>
+                                    <div className="w-52">
+                                        <MemoizedPagePreview 
+                                            page={p} 
+                                            index={index} 
+                                            onRotate={handleRotate} 
+                                            onDelete={handleDelete} 
+                                            onDuplicate={handleDuplicate} 
+                                            onDragStart={() => setDraggedIndex(index)} 
+                                            onDrop={() => handleDrop(index)} 
+                                            onPageClick={(e) => handlePageClick(e, p.id)} 
+                                            isSelected={selectedPages.has(p.id)} 
+                                            isDragging={draggedIndex === index}
+                                            sourceFiles={sourceFiles} 
+                                        />
+                                    </div>
+                                    <AddPagePlaceholder onAdd={handleAddLocalFiles} index={index + 1} />
+                                </React.Fragment>
+                            ))}
+                        </div>
+
+                        <p className="text-center text-sm text-gray-500">استخدم Ctrl/Cmd لتحديد عدة صفحات لتحريكها أو حذفها معاً.</p>
+                     </div>}
+                    
+                    {pages.length > 0 && (<div className="animate-fade-in"><label htmlFor="filename-org" className="block text-lg font-semibold text-gray-800 mb-2">اسم الملف الناتج:</label><input type="text" id="filename-org" value={filename} onChange={(e) => setFilename(e.target.value)} className="w-full px-4 py-2 rounded-lg focus:ring-violet-400 focus:border-violet-400 text-left neumorph-inset text-gray-800 placeholder-gray-400" dir="ltr" /></div>)}
+                    
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
+                        <button onClick={() => { playSound(); handleSave(); }} disabled={isSaving || isLoading || pages.length === 0} className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 font-semibold neumorph-btn disabled:opacity-60 disabled:cursor-not-allowed !text-violet-500"><i className={`fas ${isSaving ? 'fa-spinner spinner' : 'fa-save'}`}></i><span>{isSaving ? 'جاري الحفظ...' : 'حفظ الملف'}</span></button>
+                        {downloadUrl && <a href={downloadUrl} download={filename} onClick={() => playSound()} className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3 font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-violet-500 text-white animate-fade-in"><i className="fas fa-download"></i><span>تحميل</span></a>}
+                    </div>
+                </div>
+            );
+        };
+        
+        const PdfToJpgTool = ({ files }) => {
+            const [pdfFile, setPdfFile] = useState(null);
+            const [images, setImages] = useState([]);
+            const [isConverting, setIsConverting] = useState(false);
+            const [progress, setProgress] = useState(0);
+            const [error, setError] = useState(null);
+            const [filename, setFilename] = useState('');
+
+            useEffect(() => {
+                const firstPdf = files.find(f => f.file.type === 'application/pdf');
+                if (firstPdf) {
+                    if (!pdfFile || pdfFile.id !== firstPdf.id) {
+                         setPdfFile(firstPdf);
+                         setImages([]); 
+                         setError(null);
+                         setFilename(`${firstPdf.file.name.replace(/\.pdf$/i, '')}.zip`);
+                         handleConvert(firstPdf.file);
+                    }
+                } else {
+                    setPdfFile(null);
+                    setImages([]);
+                }
+            }, [files]);
+
+            const handleConvert = async (fileToConvert) => {
+                if(!fileToConvert) return;
+                setIsConverting(true); setProgress(0);
+                try { setImages(await pdfService.convertPdfToJpg(fileToConvert, setProgress)); } 
+                catch (err) { setError(`فشل التحويل: ${err.message}`); } 
+                finally { setIsConverting(false); }
+            };
+
+            const handleDownloadAll = async () => {
+                if (!JSZip) return setError('مكتبة الضغط غير متوفرة.');
+                playSound();
+                const zip = new JSZip(); images.forEach(img => zip.file(img.filename, img.dataUrl.split(',')[1], { base64: true }));
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipBlob); 
+                link.download = filename || 'images.zip';
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            };
+
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-3xl font-bold text-center text-gray-800">{ToolType.PDF_TO_JPG}</h2>
+                    {!pdfFile && files.length > 0 && <div className="text-center p-8 neumorph-inset"><p className="text-lg">الرجاء تحديد ملف PDF من مساحة العمل لبدء التحويل.</p></div>}
+                    {!pdfFile && files.length === 0 && <div className="text-center p-8 neumorph-inset"><p className="text-lg">الرجاء إضافة ملف PDF إلى مساحة العمل لبدء التحويل.</p></div>}
+
+                    {error && <div className="bg-red-100 border border-red-300 text-red-700 p-4 rounded-lg neumorph-inset"><p>{error}</p></div>}
+                    {isConverting && <div className="w-full neumorph-inset h-4 my-4 rounded-full"><div className="bg-violet-500 h-4 rounded-full" style={{ width: `${progress}%` }}></div></div>}
+                    {images.length > 0 && (
+                        <div className="animate-fade-in space-y-6">
+                            <div>
+                                <label htmlFor="zip-filename" className="block text-lg font-semibold text-gray-800 mb-2">اسم ملف ZIP:</label>
+                                <input type="text" id="zip-filename" value={filename} onChange={(e) => setFilename(e.target.value)} className="w-full px-4 py-2 rounded-lg focus:ring-violet-400 focus:border-violet-400 text-left neumorph-inset text-gray-800 placeholder-gray-400" dir="ltr" />
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-lg font-semibold text-gray-800">الصور ({images.length}):</h3>
+                                <button onClick={handleDownloadAll} className="px-4 py-2 bg-violet-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl flex items-center gap-2 transition-transform transform hover:-translate-y-1"><i className="fas fa-file-archive"></i> تحميل الكل (ZIP)</button>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-4 neumorph-inset">
+                                {images.map((image, index) => (
+                                    <div key={index} className="relative group p-2 rounded-lg neumorph-btn">
+                                        <img src={image.dataUrl} alt={image.filename} className="w-full h-auto rounded-md" />
+                                        <a href={image.dataUrl} download={image.filename} onClick={()=>playSound()} className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition flex items-center justify-center text-white text-3xl opacity-0 group-hover:opacity-100"><i className="fas fa-download"></i></a>
+                                        <p className="text-center text-xs text-gray-600 mt-1 truncate">{image.filename}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- Terms of Use Modal Component ---
+        const TermsModal = ({ isOpen, onAccept }) => {
+            const [agreed, setAgreed] = useState(false);
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="glass-modal-overlay">
+                    <div className="glass-modal-content w-full max-w-2xl p-6 sm:p-8 my-auto relative shadow-2xl">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-violet-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-violet-300">
+                                <i className="fas fa-shield-alt"></i>
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl font-black text-gray-800">شروط الاستخدام والخصوصية</h2>
+                            <p className="text-sm sm:text-base text-gray-500 mt-1">يرجى قراءة الشروط والموافقة عليها لمتابعة استخدام الموقع بسلاسة</p>
+                        </div>
+
+                        <div className="space-y-4 mb-6">
+                            {/* Card 1: 100% Local Processing */}
+                            <div className="glass-card-item p-4 sm:p-5 flex items-start gap-4">
+                                <div className="text-2xl text-emerald-500 mt-1 flex-shrink-0">
+                                    <i className="fas fa-microchip"></i>
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-gray-800 text-base flex items-center gap-2">
+                                        <span>معالجة محلية 100%</span>
+                                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">أمان تام</span>
+                                    </h4>
+                                    <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
+                                        تتم جميع عمليات تحويل ومعالجة الملفات محلياً بالكامل داخل متصفحك، ولا يتم تخزين أو رفع أي ملفات أو بيانات إلى أي خوادم خارجية.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Disclaimer */}
+                            <div className="glass-card-item p-4 sm:p-5 flex items-start gap-4">
+                                <div className="text-2xl text-amber-500 mt-1 flex-shrink-0">
+                                    <i className="fas fa-exclamation-triangle"></i>
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-gray-800 text-base flex items-center gap-2">
+                                        <span>إخلاء المسؤولية</span>
+                                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">استخدام مسؤول</span>
+                                    </h4>
+                                    <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
+                                        يتحمل المستخدم المسؤولية الكاملة عن استخدام الأدوات والملفات بطريقة مسؤولة وقانونية، وبما يتماشى مع القوانين والأنظمة المعمول بها.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Card 3: Support Us */}
+                            <div className="glass-card-item p-4 sm:p-5 flex items-start gap-4">
+                                <div className="text-2xl text-violet-500 mt-1 flex-shrink-0">
+                                    <i className="fas fa-heart"></i>
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-gray-800 text-base flex items-center gap-2">
+                                        <span>ادعم المنصة</span>
+                                        <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-semibold">استمرارية الخدمة</span>
+                                    </h4>
+                                    <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
+                                        إذا نالت خدماتنا إعجابك وترغب في استمراريتها وتطوير أدوات جديدة، نسعد بدعمك ومساهمتك لمساعدتنا في تغطية تكاليف التطوير.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Checkbox and Accept Button */}
+                        <div className="pt-2 border-t border-gray-200/70">
+                            <label className="flex items-center gap-3 cursor-pointer select-none mb-5 group">
+                                <input 
+                                    type="checkbox" 
+                                    checked={agreed} 
+                                    onChange={(e) => setAgreed(e.target.checked)}
+                                    className="w-5 h-5 text-violet-600 rounded border-gray-300 focus:ring-violet-500 focus:ring-2 cursor-pointer transition-all"
+                                />
+                                <span className="text-sm sm:text-base font-semibold text-gray-700 group-hover:text-violet-700 transition-colors">
+                                    أوافق على شروط الاستخدام وسياسة الخصوصية الموضحة أعلاه
+                                </span>
+                            </label>
+
+                            <button 
+                                onClick={() => { playSound(); onAccept(); }}
+                                disabled={!agreed}
+                                className={`w-full py-3.5 px-6 rounded-xl font-bold text-base transition-all duration-300 shadow-md flex items-center justify-center gap-2 ${
+                                    agreed 
+                                        ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-300 hover:shadow-lg transform hover:-translate-y-0.5 cursor-pointer' 
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                                }`}
+                            >
+                                <i className="fas fa-check-circle"></i>
+                                <span>متابعة واستخدام الموقع</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App Component ---
+        const App = () => {
+            const [files, setFiles] = useState([]);
+            const [error, setError] = useState(null);
+            const [activeTool, setActiveTool] = useState(ToolType.JPG_TO_PDF);
+            const [showTerms, setShowTerms] = useState(false);
+
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    setShowTerms(true);
+                }, 2000);
+                return () => clearTimeout(timer);
+            }, []);
+
+            const handleAcceptTerms = () => {
+                setShowTerms(false);
+            };
+            
+            const handleFilesAdded = useCallback((newFiles) => {
+                setError(null);
+                const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+                const validFiles = Array.from(newFiles).filter(f => allowedTypes.includes(f.type));
+                if (validFiles.length !== newFiles.length) { setError('تم تجاهل بعض الملفات. الأنواع المدعومة هي PDF, JPG, PNG, WEBP.'); }
+                if (validFiles.length === 0) return;
+                const appFiles = validFiles.map(file => ({ id: `${file.name}-${file.lastModified}-${Math.random()}`, file }));
+                setFiles(prev => [...prev, ...appFiles]);
+            }, []);
+            
+            useEffect(() => {
+                const handlePaste = (event) => {
+                    const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+                    const imageFiles = [];
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].type.indexOf('image') !== -1) {
+                            const file = items[i].getAsFile();
+                            if(file) imageFiles.push(file);
+                        }
+                    }
+                    if (imageFiles.length > 0) {
+                        handleFilesAdded(imageFiles);
+                    }
+                };
+                window.addEventListener('paste', handlePaste);
+                return () => window.removeEventListener('paste', handlePaste);
+            }, [handleFilesAdded]);
+            
+            const handleRemoveFile = useCallback((id) => setFiles(prev => prev.filter(f => f.id !== id)), []);
+            const handleReorderFiles = useCallback((from, to) => { setFiles(prev => { const newFiles = [...prev]; const [movedItem] = newFiles.splice(from, 1); newFiles.splice(to, 0, movedItem); return newFiles; }); }, []);
+            const handleClearQueue = useCallback(() => { playSound(); setFiles([]); setError(null); }, []);
+
+            const renderActiveTool = useCallback(() => {
+                switch (activeTool) {
+                    case ToolType.JPG_TO_PDF: case ToolType.PDF_COMPRESSOR: return <CombineTool files={files} toolType={activeTool} />;
+                    case ToolType.ORGANIZE_PDF: return <OrganizeTool files={files} />;
+                    case ToolType.PDF_TO_JPG: return <PdfToJpgTool files={files} />;
+                    case ToolType.DOC_TO_PDF: case ToolType.PDF_TO_DOC: case ToolType.PDF_TO_EXCEL: case ToolType.PDF_TO_POWERPOINT: return <ComingSoonTool toolType={activeTool} />;
+                    default: return <CombineTool files={files} toolType={ToolType.JPG_TO_PDF} />;
+                }
+            }, [activeTool, files]);
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-start p-4 selection:bg-violet-500 selection:text-white">
+                    <TermsModal isOpen={showTerms} onAccept={handleAcceptTerms} />
+                    <main className="w-full max-w-6xl neumorph-card p-6 md:p-10 space-y-8 my-10">
+                        <header className="text-center">
+                            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-800">محول PDF الاحترافي <span className="animated-rocket inline-block">🚀</span></h1>
+                            <p className="mt-4 text-lg text-gray-600">ارفع ملفاتك مرة واحدة، ثم استخدم أي أداة تريدها بسلاسة.</p>
+                        </header>
+
+                        <div className="space-y-4">
+                            <GlobalDropzone 
+                                onFilesAdded={handleFilesAdded} 
+                                acceptedTypes=".pdf,.jpg,.jpeg,.png,.webp"
+                                message="اسحب الصور والملفات هنا أو انقر للرفع"
+                            />
+                             {error && <div className="bg-red-100 border border-red-300 text-red-700 p-4 rounded-lg neumorph-inset" role="alert"><p className="font-bold">خطأ</p><p>{error}</p></div>}
+                            {files.length > 0 && (
+                                <div className="animate-fade-in space-y-3">
+                                    <GlobalFilePreviewer files={files} onRemoveFile={handleRemoveFile} onReorderFiles={handleReorderFiles} />
+                                    <div className="text-center">
+                                       <button onClick={handleClearQueue} className="neumorph-btn px-4 py-2 text-red-500 font-semibold flex items-center gap-2 mx-auto">
+                                            <i className="fas fa-trash"></i> حذف كل الملفات في مساحة العمل
+                                       </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="border-t-2 border-gray-200 my-8"></div>
+                        
+                        <Toolbox activeTool={activeTool} onSelectTool={setActiveTool} />
+                        
+                        <div className="mt-6 animate-fade-in neumorph-inset p-6 md:p-8">{renderActiveTool()}</div>
+                    </main>
+                    <footer className="w-full max-w-4xl text-center pb-8 text-sm text-gray-500">
+                        <div className="mb-2">
+                            <span className="font-semibold text-gray-700 text-base">ibrahim imad</span>
+                        </div>
+                        <p>© 2025 جميع الحقوق محفوظة</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        // --- Mount React App ---
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+    </script>
+    
+    <script>
+        // --- Code Protection (Deterrent) ---
+        // Disables right-click, dev tools shortcuts. This is a deterrent, not foolproof security.
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.onkeydown = function(e) {
+            if (e.keyCode === 123 || // F12
+                (e.ctrlKey && e.shiftKey && (e.keyCode === 'I'.charCodeAt(0) || e.keyCode === 'J'.charCodeAt(0))) || // Ctrl+Shift+I/J
+                (e.ctrlKey && e.keyCode === 'U'.charCodeAt(0))) { // Ctrl+U
+                try {
+                    e.preventDefault();
+                    e.stopPropagation();
+                } catch(e) {}
+                return false;
+            }
+        };
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
